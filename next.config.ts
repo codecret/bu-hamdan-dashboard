@@ -1,11 +1,22 @@
 import type { NextConfig } from "next";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+const apiBase = API_URL.replace(/\/api\/?$/, "");
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**" },
       { protocol: "http", hostname: "localhost" },
     ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/proxy-api/:path*",
+        destination: `${apiBase}/api/:path*`,
+      },
+    ];
   },
   async headers() {
     return [

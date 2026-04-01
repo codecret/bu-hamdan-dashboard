@@ -1,12 +1,7 @@
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-if (!API_URL) {
-  console.warn("NEXT_PUBLIC_API_URL is not set, defaulting to http://localhost:3000/api");
-}
-
 const api = axios.create({
-  baseURL: API_URL || "http://localhost:3000/api",
+  baseURL: "/proxy-api",
   timeout: 15000,
   headers: { "Content-Type": "application/json" },
 });
