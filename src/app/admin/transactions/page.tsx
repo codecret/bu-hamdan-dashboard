@@ -1,106 +1,66 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { type ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, CreditCard } from "lucide-react";
+import { CreditCard } from "lucide-react";
+import { DataTable } from "@/components/ui/data-table";
 import { transactionsApi } from "@/lib/admin-api";
 import { toast } from "sonner";
+import type { AdminTransaction } from "@/types";
+import { PAGE_LIMIT } from "@/types";
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const abortRef = useRef<AbortController | null>(null);
 
   const fetchData = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     try {
-      const res = await transactionsApi.list({ page, limit: 20 });
+      const res = await transactionsApi.list({ page, limit: PAGE_LIMIT });
+      if (controller.signal.aborted) return;
       setTransactions(res.data);
       setTotal(res.total);
-    } catch {
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       toast.error("Failed to load transactions");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [page]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const totalPages = Math.ceil(total / 20);
+  const totalPages = Math.ceil(total / PAGE_LIMIT);
+
+  const columns: ColumnDef<AdminTransaction>[] = [
+    { accessorKey: "id", header: "ID", cell: ({ getValue }) => <span className="font-mono text-xs">{(getValue() as string).slice(0, 8)}...</span> },
+    { accessorKey: "userName", header: "User", cell: ({ getValue }) => <span className="font-medium">{(getValue() as string) || "—"}</span> },
+    { accessorKey: "type", header: "Type" },
+    { accessorKey: "amount", header: "Amount", cell: ({ getValue }) => <span className="font-medium">{Number(getValue()).toLocaleString()}</span> },
+    { accessorKey: "currency", header: "Currency" },
+    {
+      accessorKey: "status", header: "Status",
+      cell: ({ getValue }) => {
+        const s = getValue() as string;
+        return <Badge variant={s === "completed" ? "default" : s === "pending" ? "secondary" : "outline"}>{s}</Badge>;
+      },
+    },
+    { accessorKey: "paymentMethod", header: "Method", cell: ({ getValue }) => <span>{(getValue() as string) || "—"}</span> },
+    { accessorKey: "paymentRef", header: "Ref", cell: ({ getValue }) => { const r = getValue() as string | null; return <span className="font-mono text-xs max-w-[120px] truncate block" title={r || ""}>{r || "—"}</span>; } },
+    { accessorKey: "createdAt", header: "Date", cell: ({ getValue }) => <span className="text-xs">{new Date(getValue() as string).toLocaleDateString()}</span> },
+  ];
 
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Transactions</h1>
-
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Currency</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead>Ref</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}>{Array.from({ length: 9 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}</TableRow>
-                ))
-              ) : transactions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <CreditCard className="h-12 w-12" />
-                      <p>No transactions yet</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                transactions.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-mono text-xs">{t.id.slice(0, 8)}...</TableCell>
-                    <TableCell className="font-medium">{t.userName || "—"}</TableCell>
-                    <TableCell>{t.type}</TableCell>
-                    <TableCell className="font-medium">{Number(t.amount).toLocaleString()}</TableCell>
-                    <TableCell>{t.currency}</TableCell>
-                    <TableCell>
-                      <Badge variant={t.status === "completed" ? "default" : t.status === "pending" ? "secondary" : "outline"}>
-                        {t.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{t.paymentMethod || "—"}</TableCell>
-                    <TableCell className="font-mono text-xs max-w-[120px] truncate" title={t.paymentRef || ""}>{t.paymentRef || "—"}</TableCell>
-                    <TableCell className="text-xs">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {total > 20 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">{total} total transactions</p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}><ChevronLeft className="h-4 w-4" /> Prev</Button>
-            <span className="text-sm py-2">Page {page} of {totalPages}</span>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next <ChevronRight className="h-4 w-4" /></Button>
-          </div>
-        </div>
-      )}
+      <DataTable columns={columns} data={transactions} loading={loading} page={page} totalPages={totalPages} total={total} onPageChange={setPage} emptyIcon={<CreditCard className="h-12 w-12" />} emptyMessage="No transactions yet" />
     </div>
   );
 }

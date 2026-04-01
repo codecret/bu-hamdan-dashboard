@@ -74,6 +74,87 @@ export interface Transaction {
   createdAt: string;
 }
 
+/** Admin-enriched listing with joined make/model/user data */
+export interface AdminListing extends Listing {
+  makeName: string | null;
+  makeNameEn: string | null;
+  modelName: string | null;
+  modelNameEn: string | null;
+  userName: string | null;
+  primaryImage: string | null;
+  isNegotiable: boolean;
+  interiorColor: string | null;
+  engineSize: string | null;
+  cylinders: number | null;
+  horsepower: number | null;
+  description: string | null;
+  location: string;
+  governorate: string;
+  city: string;
+  featuredUntil: string | null;
+}
+
+export interface AdminListingDetail extends AdminListing {
+  trimName: string | null;
+  trimNameEn: string | null;
+  userPhone: string | null;
+  userAvatarUrl: string | null;
+  images: ListingImage[];
+  features: ListingFeature[];
+}
+
+export interface ListingImage {
+  id: string;
+  listingId: string;
+  url: string;
+  thumbnailUrl: string;
+  order: number;
+  isPrimary: boolean;
+}
+
+export interface ListingFeature {
+  id: string;
+  listingId: string;
+  name: string;
+  nameEn: string;
+  category: string;
+}
+
+export interface UserProfile {
+  id: string;
+  userId: string;
+  bio: string | null;
+  location: string | null;
+  governorate: string | null;
+  city: string | null;
+  whatsappNumber: string | null;
+  favoriteCar: string | null;
+  listingsCount: number;
+  rating: string;
+  reviewsCount: number;
+}
+
+export interface UserDetail extends User {
+  profile: UserProfile | null;
+  listings: Listing[];
+}
+
+export interface AdminShowroom extends Showroom {
+  logoUrl: string | null;
+  coverUrl: string | null;
+  whatsappBusiness: string | null;
+  website: string | null;
+  workingHours: unknown;
+  ownerName: string | null;
+  ownerEmail: string | null;
+}
+
+export interface AdminTransaction extends Transaction {
+  listingId: string | null;
+  paymentRef: string | null;
+  userName: string | null;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -81,6 +162,8 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+
+export const PAGE_LIMIT = 20;
 
 export interface AnalyticsOverview {
   totalUsers: number;
