@@ -43,22 +43,24 @@ export default function TransactionsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
+                <TableHead>User</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Currency</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Method</TableHead>
+                <TableHead>Ref</TableHead>
                 <TableHead>Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}</TableRow>
+                  <TableRow key={i}>{Array.from({ length: 9 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}</TableRow>
                 ))
               ) : transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={9} className="text-center py-12">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                       <CreditCard className="h-12 w-12" />
                       <p>No transactions yet</p>
@@ -69,6 +71,7 @@ export default function TransactionsPage() {
                 transactions.map((t) => (
                   <TableRow key={t.id}>
                     <TableCell className="font-mono text-xs">{t.id.slice(0, 8)}...</TableCell>
+                    <TableCell className="font-medium">{t.userName || "—"}</TableCell>
                     <TableCell>{t.type}</TableCell>
                     <TableCell className="font-medium">{Number(t.amount).toLocaleString()}</TableCell>
                     <TableCell>{t.currency}</TableCell>
@@ -78,6 +81,7 @@ export default function TransactionsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{t.paymentMethod || "—"}</TableCell>
+                    <TableCell className="font-mono text-xs max-w-[120px] truncate" title={t.paymentRef || ""}>{t.paymentRef || "—"}</TableCell>
                     <TableCell className="text-xs">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
                   </TableRow>
                 ))

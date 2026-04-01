@@ -35,6 +35,7 @@ export const usersApi = {
 export const listingsApi = {
   list: (params?: Record<string, string | number>) =>
     api.get<PaginatedResponse<Listing>>("/admin/listings", { params }).then((r) => r.data),
+  get: (id: string) => api.get(`/admin/listings/${id}`).then((r) => r.data),
   updateStatus: (id: string, status: string) =>
     api.patch<Listing>(`/admin/listings/${id}/status`, { status }).then((r) => r.data),
   toggleFeatured: (id: string, isFeatured: boolean, days?: number) =>
