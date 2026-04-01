@@ -8,6 +8,11 @@ import type {
   Transaction,
   PaginatedResponse,
   AnalyticsOverview,
+  AdminListing,
+  AdminListingDetail,
+  AdminShowroom,
+  AdminTransaction,
+  UserDetail,
 } from "@/types";
 
 // Auth
@@ -26,7 +31,7 @@ export const analyticsApi = {
 export const usersApi = {
   list: (params?: Record<string, string | number>) =>
     api.get<PaginatedResponse<User>>("/admin/users", { params }).then((r) => r.data),
-  get: (id: string) => api.get<User & { listings: Listing[] }>(`/admin/users/${id}`).then((r) => r.data),
+  get: (id: string) => api.get<UserDetail>(`/admin/users/${id}`).then((r) => r.data),
   update: (id: string, data: Partial<Pick<User, "isActive" | "isVerified" | "role">>) =>
     api.patch<User>(`/admin/users/${id}`, data).then((r) => r.data),
 };
@@ -34,8 +39,8 @@ export const usersApi = {
 // Admin Listings
 export const listingsApi = {
   list: (params?: Record<string, string | number>) =>
-    api.get<PaginatedResponse<Listing>>("/admin/listings", { params }).then((r) => r.data),
-  get: (id: string) => api.get(`/admin/listings/${id}`).then((r) => r.data),
+    api.get<PaginatedResponse<AdminListing>>("/admin/listings", { params }).then((r) => r.data),
+  get: (id: string) => api.get<AdminListingDetail>(`/admin/listings/${id}`).then((r) => r.data),
   updateStatus: (id: string, status: string) =>
     api.patch<Listing>(`/admin/listings/${id}/status`, { status }).then((r) => r.data),
   toggleFeatured: (id: string, isFeatured: boolean, days?: number) =>
@@ -57,7 +62,7 @@ export const catalogApi = {
 
 // Showrooms
 export const showroomsApi = {
-  list: () => api.get<Showroom[]>("/admin/showrooms").then((r) => r.data),
+  list: () => api.get<AdminShowroom[]>("/admin/showrooms").then((r) => r.data),
   update: (id: string, data: Partial<Pick<Showroom, "isVerified">>) =>
     api.patch<Showroom>(`/admin/showrooms/${id}`, data).then((r) => r.data),
 };
@@ -71,5 +76,5 @@ export const notificationsApi = {
 // Transactions
 export const transactionsApi = {
   list: (params?: Record<string, string | number>) =>
-    api.get<PaginatedResponse<Transaction>>("/admin/transactions", { params }).then((r) => r.data),
+    api.get<PaginatedResponse<AdminTransaction>>("/admin/transactions", { params }).then((r) => r.data),
 };
