@@ -251,7 +251,7 @@ export default function ListingsPage() {
               </p>
               <div className="space-y-2">
                 <label className="text-sm font-medium">مدة الترويج</label>
-                <Select value={promoDays} onValueChange={setPromoDays}>
+                <Select value={promoDays} onValueChange={(v) => v !== null && setPromoDays(v)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
