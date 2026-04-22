@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cairo, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import { QueryProvider } from "@/lib/query-provider";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -39,8 +40,10 @@ export default function RootLayout({
           defaultTheme="light"
           disableTransitionOnChange
         >
-          {children}
-          <Toaster position="top-right" richColors closeButton />
+          <QueryProvider>
+            {children}
+            <Toaster position="top-right" richColors closeButton />
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>
