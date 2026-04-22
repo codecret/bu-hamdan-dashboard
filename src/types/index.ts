@@ -129,6 +129,11 @@ export interface UserProfile {
   city: string | null;
   whatsappNumber: string | null;
   favoriteCar: string | null;
+  favoriteMakeId: string | null;
+  favoriteModelId: string | null;
+  favoriteTrim: string | null;
+  favoriteMake: { id: string; name: string; nameEn: string } | null;
+  favoriteModel: { id: string; name: string; nameEn: string } | null;
   listingsCount: number;
   rating: string;
   reviewsCount: number;

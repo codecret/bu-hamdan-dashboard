@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Eye, User as UserIcon, Car, MapPin, Star } from "lucide-react";
+import { Search, Eye, User as UserIcon, Car, MapPin, Star, Heart } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { usersApi } from "@/lib/admin-api";
 import { toast } from "sonner";
@@ -189,6 +189,34 @@ export default function UsersPage() {
                     {viewDialog.profile.whatsappNumber && <div><div className="text-xs text-muted-foreground">WhatsApp</div><div className="font-medium">{viewDialog.profile.whatsappNumber}</div></div>}
                     <div className="flex items-start gap-1.5"><Star className="h-4 w-4 text-yellow-500 mt-0.5" /><div><div className="text-xs text-muted-foreground">Rating</div><div className="font-medium">{viewDialog.profile.rating} ({viewDialog.profile.reviewsCount} reviews)</div></div></div>
                     <div className="flex items-start gap-1.5"><Car className="h-4 w-4 text-muted-foreground mt-0.5" /><div><div className="text-xs text-muted-foreground">Listings</div><div className="font-medium">{viewDialog.profile.listingsCount}</div></div></div>
+                    {(viewDialog.profile.favoriteMake || viewDialog.profile.favoriteCar) && (
+                      <div className="flex items-start gap-1.5 col-span-2">
+                        <Heart className="h-4 w-4 text-red-500 mt-0.5" />
+                        <div>
+                          <div className="text-xs text-muted-foreground">Favorite Car</div>
+                          <div className="font-medium">
+                            {[
+                              viewDialog.profile.favoriteMake?.name,
+                              viewDialog.profile.favoriteModel?.name,
+                              viewDialog.profile.favoriteTrim,
+                            ]
+                              .filter(Boolean)
+                              .join(" ") || viewDialog.profile.favoriteCar}
+                          </div>
+                          {(viewDialog.profile.favoriteMake?.nameEn ||
+                            viewDialog.profile.favoriteModel?.nameEn) && (
+                            <div className="text-xs text-muted-foreground">
+                              {[
+                                viewDialog.profile.favoriteMake?.nameEn,
+                                viewDialog.profile.favoriteModel?.nameEn,
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
