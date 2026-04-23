@@ -85,8 +85,8 @@ export default function UsersPage() {
         </div>
       ),
     },
-    { accessorKey: "email", header: "Email", cell: ({ getValue }) => <span className="text-sm">{getValue() as string}</span> },
-    { accessorKey: "phone", header: "Phone", cell: ({ getValue }) => <span className="text-sm">{getValue() as string}</span> },
+    { accessorKey: "email", header: "Email", cell: ({ getValue }) => <span className="text-sm" dir="ltr">{getValue() as string}</span> },
+    { accessorKey: "phone", header: "Phone", cell: ({ getValue }) => <span className="text-sm font-mono tabular-nums" dir="ltr">{getValue() as string}</span> },
     { accessorKey: "accountType", header: "Type", cell: ({ getValue }) => <Badge variant="outline">{getValue() as string}</Badge> },
     { accessorKey: "role", header: "Role", cell: ({ getValue }) => <Badge variant={(getValue() as string) === "admin" ? "default" : "secondary"}>{getValue() as string}</Badge> },
     { accessorKey: "createdAt", header: "Joined", cell: ({ getValue }) => <span className="text-xs">{new Date(getValue() as string).toLocaleDateString()}</span> },
@@ -146,10 +146,10 @@ export default function UsersPage() {
                 ) : (
                   <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center"><UserIcon className="h-8 w-8 text-muted-foreground" /></div>
                 )}
-                <div>
-                  <h3 className="text-lg font-semibold">{viewDialog.name}</h3>
-                  <p className="text-sm text-muted-foreground">{viewDialog.email}</p>
-                  <p className="text-sm text-muted-foreground">{viewDialog.phone}</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-semibold break-words">{viewDialog.name}</h3>
+                  <p className="text-sm text-muted-foreground break-all" dir="ltr">{viewDialog.email}</p>
+                  <p className="text-sm text-muted-foreground font-mono tabular-nums" dir="ltr">{viewDialog.phone}</p>
                 </div>
               </div>
               {viewDialog.profile && (
