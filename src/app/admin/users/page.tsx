@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Eye, User as UserIcon, Car, MapPin, Heart } from "lucide-react";
+import { Search, Eye, User as UserIcon, Car, MapPin, Heart, Sparkles, Wallet, KeyRound } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { usersApi } from "@/lib/admin-api";
 import { toast } from "sonner";
@@ -24,6 +25,39 @@ export default function UsersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [accountType, setAccountType] = useState<string>("all");
   const [viewId, setViewId] = useState<string | null>(null);
+  const [pwdTargetId, setPwdTargetId] = useState<string | null>(null);
+  const [pwdNew, setPwdNew] = useState("");
+  const [pwdConfirm, setPwdConfirm] = useState("");
+  const [pwdShow, setPwdShow] = useState(false);
+
+  const setPasswordMutation = useMutation({
+    mutationFn: async () => {
+      if (!pwdTargetId) throw new Error("No target user");
+      return usersApi.setPassword(pwdTargetId, pwdNew);
+    },
+    onSuccess: () => {
+      toast.success("Password updated");
+      setPwdTargetId(null);
+      setPwdNew("");
+      setPwdConfirm("");
+      setPwdShow(false);
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      toast.error(err.response?.data?.message ?? "Password update failed");
+    },
+  });
+
+  const handleSavePassword = () => {
+    if (pwdNew.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    if (pwdNew !== pwdConfirm) {
+      toast.error("Passwords don't match");
+      return;
+    }
+    setPasswordMutation.mutate();
+  };
 
   // Debounce search input to avoid hammering the API on every keystroke
   useEffect(() => {
@@ -152,6 +186,40 @@ export default function UsersPage() {
                   <p className="text-sm text-muted-foreground font-mono tabular-nums" dir="ltr">{viewDialog.phone}</p>
                 </div>
               </div>
+              {(viewDialog.subscription || viewDialog.activeCredits > 0) && (
+                <div className="border-t pt-3 space-y-2">
+                  <h4 className="text-sm font-medium flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-violet-600" />
+                    Subscription &amp; credits
+                  </h4>
+                  {viewDialog.subscription ? (
+                    <div className="rounded-lg border bg-violet-50/40 px-3 py-2 text-sm space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{viewDialog.subscription.planNameEn}</span>
+                        <Badge variant={viewDialog.subscription.isActive ? "default" : "outline"}>
+                          {viewDialog.subscription.isActive ? "active" : viewDialog.subscription.status}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {Number(viewDialog.subscription.planPriceKwd).toFixed(3)} KWD ·{" "}
+                        {viewDialog.subscription.planQuota} listings/cycle
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Period: {new Date(viewDialog.subscription.currentPeriodStart).toLocaleDateString()}{" "}
+                        → {new Date(viewDialog.subscription.currentPeriodEnd).toLocaleDateString()}
+                        {viewDialog.subscription.cancelAtPeriodEnd && " · cancels at period end"}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">No subscription on file.</div>
+                  )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Active credits:</span>
+                    <span className="font-medium">{viewDialog.activeCredits}</span>
+                  </div>
+                </div>
+              )}
               {viewDialog.profile && (
                 <div className="space-y-3 border-t pt-3">
                   {viewDialog.profile.bio && <div><h4 className="text-xs text-muted-foreground">Bio</h4><p className="text-sm">{viewDialog.profile.bio}</p></div>}
@@ -205,9 +273,87 @@ export default function UsersPage() {
                   </div>
                 </div>
               )}
+              <div className="border-t pt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => {
+                    setPwdTargetId(viewDialog.id);
+                    setPwdNew("");
+                    setPwdConfirm("");
+                    setPwdShow(false);
+                  }}
+                >
+                  <KeyRound className="h-4 w-4" />
+                  Change password
+                </Button>
+              </div>
               <div className="text-xs text-muted-foreground border-t pt-3">Joined {new Date(viewDialog.createdAt).toLocaleDateString()}</div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!pwdTargetId} onOpenChange={(open) => !open && !setPasswordMutation.isPending && setPwdTargetId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-600" /> Set new password
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              The user will be signed out from their other sessions on next login. Share the new password with them through a secure channel.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="pwd-new">New password</Label>
+              <Input
+                id="pwd-new"
+                type={pwdShow ? "text" : "password"}
+                value={pwdNew}
+                onChange={(e) => setPwdNew(e.target.value)}
+                placeholder="At least 8 characters"
+                minLength={8}
+                maxLength={128}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pwd-confirm">Confirm password</Label>
+              <Input
+                id="pwd-confirm"
+                type={pwdShow ? "text" : "password"}
+                value={pwdConfirm}
+                onChange={(e) => setPwdConfirm(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={pwdShow}
+                onChange={(e) => setPwdShow(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Show password
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPwdTargetId(null)}
+              disabled={setPasswordMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSavePassword}
+              disabled={setPasswordMutation.isPending || pwdNew.length < 8 || pwdNew !== pwdConfirm}
+            >
+              {setPasswordMutation.isPending ? "Saving..." : "Save password"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

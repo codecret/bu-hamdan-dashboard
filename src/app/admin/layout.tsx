@@ -11,6 +11,8 @@ import {
   BookOpen,
   Building2,
   CreditCard,
+  ClipboardCheck,
+  Sparkles,
   LogOut,
   ChevronDown,
 } from "lucide-react";
@@ -46,7 +48,9 @@ const navItems = [
   { title: "Listings", href: "/admin/listings", icon: Car },
   { title: "Catalog", href: "/admin/catalog", icon: BookOpen },
   { title: "Showrooms", href: "/admin/showrooms", icon: Building2 },
+  { title: "Subscriptions", href: "/admin/subscriptions", icon: Sparkles },
   { title: "Transactions", href: "/admin/transactions", icon: CreditCard },
+  { title: "Inspections", href: "/admin/inspections", icon: ClipboardCheck },
 ];
 
 function getPageTitle(pathname: string) {

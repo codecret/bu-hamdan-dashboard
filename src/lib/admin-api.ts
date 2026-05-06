@@ -12,6 +12,7 @@ import type {
   AdminListingDetail,
   AdminShowroom,
   AdminTransaction,
+  AdminSubscription,
   UserDetail,
 } from "@/types";
 
@@ -34,6 +35,8 @@ export const usersApi = {
   get: (id: string) => api.get<UserDetail>(`/admin/users/${id}`).then((r) => r.data),
   update: (id: string, data: Partial<Pick<User, "isActive" | "isVerified" | "role">>) =>
     api.patch<User>(`/admin/users/${id}`, data).then((r) => r.data),
+  setPassword: (id: string, newPassword: string) =>
+    api.post<void>(`/admin/users/${id}/password`, { newPassword }).then(() => undefined),
 };
 
 // Admin Listings
@@ -60,6 +63,21 @@ export const catalogApi = {
   deleteModel: (id: string) => api.delete(`/admin/catalog/models/${id}`),
 };
 
+// Upload helpers
+export const uploadApi = {
+  // Logo upload — preserves PNG/WebP alpha, no thumbnail. For brand/showroom marks.
+  uploadLogo: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append("logo", file);
+    // Drop the default JSON Content-Type so axios writes the multipart boundary itself.
+    const res = await api.post<{ url: string }>("/upload/logo", formData, {
+      headers: { "Content-Type": undefined as unknown as string },
+    });
+    if (!res.data?.url) throw new Error("Upload returned no URL");
+    return res.data;
+  },
+};
+
 // Showrooms
 export const showroomsApi = {
   list: () => api.get<AdminShowroom[]>("/admin/showrooms").then((r) => r.data),
@@ -77,4 +95,44 @@ export const notificationsApi = {
 export const transactionsApi = {
   list: (params?: Record<string, string | number>) =>
     api.get<PaginatedResponse<AdminTransaction>>("/admin/transactions", { params }).then((r) => r.data),
+};
+
+// Subscriptions
+export const subscriptionsApi = {
+  list: (params?: Record<string, string | number>) =>
+    api
+      .get<PaginatedResponse<AdminSubscription>>("/admin/subscriptions", { params })
+      .then((r) => r.data),
+};
+
+// Inspections
+export interface AdminInspection {
+  id: string;
+  userId: string;
+  listingId: string;
+  status: "pending" | "scheduled" | "completed" | "cancelled";
+  notes: string | null;
+  preferredDate: string | null;
+  preferredTime: string | null;
+  createdAt: string;
+  userName: string | null;
+  userPhone: string | null;
+  userEmail: string | null;
+  makeNameAr: string | null;
+  makeNameEn: string | null;
+  modelNameAr: string | null;
+  modelNameEn: string | null;
+  listingYear: number | null;
+  listingPrice: string | null;
+}
+
+export const inspectionsApi = {
+  list: (params?: Record<string, string | number>) =>
+    api
+      .get<PaginatedResponse<AdminInspection>>("/admin/inspections", { params })
+      .then((r) => r.data),
+  updateStatus: (id: string, status: AdminInspection["status"]) =>
+    api
+      .patch<AdminInspection>(`/admin/inspections/${id}/status`, { status })
+      .then((r) => r.data),
 };

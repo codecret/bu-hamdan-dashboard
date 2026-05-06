@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -12,17 +11,16 @@ import {
   Clock,
   DollarSign,
   Building2,
-  MessageSquare,
   TrendingUp,
   ArrowUpRight,
   ArrowRight,
   RefreshCw,
   AlertCircle,
   Activity,
+  Sparkles,
 } from "lucide-react";
 import { analyticsApi } from "@/lib/admin-api";
 import { useAuthStore } from "@/stores/auth-store";
-import type { AnalyticsOverview } from "@/types";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   active: { label: "Active", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
@@ -31,6 +29,20 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   sold: { label: "Sold", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
   expired: { label: "Expired", color: "text-gray-700", bg: "bg-gray-50 border-gray-200" },
 };
+
+const TIER_SHORT: Record<string, string> = {
+  regular_single: "single",
+  showroom_monthly: "showroom",
+  dealer_monthly: "dealer",
+};
+
+function subscriptionsBreakdownText(byTier: Record<string, number> | undefined): string | undefined {
+  if (!byTier) return undefined;
+  const parts = Object.entries(byTier)
+    .filter(([, n]) => n > 0)
+    .map(([t, n]) => `${n} ${TIER_SHORT[t] ?? t}`);
+  return parts.length ? parts.join(" · ") : undefined;
+}
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -41,29 +53,18 @@ function getGreeting() {
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
-  const [data, setData] = useState<AnalyticsOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    analyticsApi
-      .overview()
-      .then(setData)
-      .catch((err) =>
-        setError(err.response?.data?.message || "Failed to load dashboard"),
-      )
-      .finally(() => setLoading(false));
-  }, []);
+  const overviewQuery = useQuery({
+    queryKey: ["admin", "analytics", "overview"],
+    queryFn: analyticsApi.overview,
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  if (overviewQuery.isLoading) return <DashboardSkeleton />;
 
-  if (loading) return <DashboardSkeleton />;
-
-  if (error || !data) {
+  if (overviewQuery.isError || !overviewQuery.data) {
+    const error =
+      (overviewQuery.error as { response?: { data?: { message?: string } } } | null)
+        ?.response?.data?.message ?? "Something went wrong";
     return (
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="flex flex-col items-center gap-4 text-center max-w-sm">
@@ -72,11 +73,9 @@ export default function DashboardPage() {
           </div>
           <div>
             <h2 className="text-lg font-semibold">Failed to load dashboard</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {error || "Something went wrong"}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{error}</p>
           </div>
-          <Button onClick={fetchData} variant="outline" className="gap-2">
+          <Button onClick={() => overviewQuery.refetch()} variant="outline" className="gap-2">
             <RefreshCw className="size-4" />
             Try again
           </Button>
@@ -84,6 +83,8 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const data = overviewQuery.data;
 
   const totalListings = Object.values(data.listings).reduce(
     (a, b) => a + b,
@@ -107,10 +108,11 @@ export default function DashboardPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={fetchData}
+          onClick={() => overviewQuery.refetch()}
+          disabled={overviewQuery.isFetching}
           className="gap-2 self-start"
         >
-          <RefreshCw className="size-3.5" />
+          <RefreshCw className={`size-3.5 ${overviewQuery.isFetching ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </div>
@@ -136,12 +138,25 @@ export default function DashboardPage() {
           iconColor="text-emerald-600"
         />
         <KPICard
-          icon={DollarSign}
-          label="Revenue"
-          value={`${data.totalRevenue.toLocaleString()} KWD`}
+          icon={Sparkles}
+          label="Active Subscriptions"
+          value={(data.activeSubscriptions ?? 0).toLocaleString()}
+          change={subscriptionsBreakdownText(data.subscriptionsByTier)}
+          trend="up"
           iconBg="bg-violet-50"
           iconColor="text-violet-600"
         />
+        <KPICard
+          icon={DollarSign}
+          label="Revenue"
+          value={`${(data.paymentsRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} KWD`}
+          change={data.totalRevenue ? `+${data.totalRevenue.toLocaleString()} legacy` : undefined}
+          iconBg="bg-amber-50"
+          iconColor="text-amber-600"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <KPICard
           icon={Building2}
           label="Showrooms"
@@ -252,7 +267,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick access */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <QuickLink
           href="/admin/users"
           icon={Users}
@@ -268,6 +283,14 @@ export default function DashboardPage() {
           description="Review and moderate listings"
           iconColor="text-emerald-600"
           iconBg="bg-emerald-50"
+        />
+        <QuickLink
+          href="/admin/subscriptions"
+          icon={Sparkles}
+          label="Subscriptions"
+          description="Showrooms, dealers and credits"
+          iconColor="text-violet-600"
+          iconBg="bg-violet-50"
         />
         <QuickLink
           href="/admin/showrooms"

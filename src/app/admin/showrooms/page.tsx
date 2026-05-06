@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,27 +14,40 @@ import { toast } from "sonner";
 import type { AdminShowroom } from "@/types";
 
 export default function ShowroomsPage() {
-  const [showrooms, setShowrooms] = useState<AdminShowroom[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
   const [viewDialog, setViewDialog] = useState<AdminShowroom | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
-    showroomsApi.list()
-      .then(setShowrooms)
-      .catch(() => toast.error("Failed to load showrooms"))
-      .finally(() => setLoading(false));
-  }, []);
+  const listQuery = useQuery({
+    queryKey: ["admin", "showrooms"],
+    queryFn: showroomsApi.list,
+  });
 
-  const handleVerify = async (id: string, isVerified: boolean) => {
-    try {
-      await showroomsApi.update(id, { isVerified });
-      setShowrooms((prev) => prev.map((s) => (s.id === id ? { ...s, isVerified } : s)));
-      toast.success(isVerified ? "Showroom verified" : "Verification removed");
-    } catch {
+  useEffect(() => {
+    if (listQuery.isError) toast.error("Failed to load showrooms");
+  }, [listQuery.isError]);
+
+  const showrooms = listQuery.data ?? [];
+
+  const verifyMutation = useMutation({
+    mutationFn: (vars: { id: string; isVerified: boolean }) =>
+      showroomsApi.update(vars.id, { isVerified: vars.isVerified }),
+    onMutate: async ({ id, isVerified }) => {
+      // Optimistic update — flip the toggle instantly, roll back on error
+      await qc.cancelQueries({ queryKey: ["admin", "showrooms"] });
+      const previous = qc.getQueryData<AdminShowroom[]>(["admin", "showrooms"]);
+      qc.setQueryData<AdminShowroom[]>(["admin", "showrooms"], (old) =>
+        old?.map((s) => (s.id === id ? { ...s, isVerified } : s)) ?? [],
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(["admin", "showrooms"], ctx.previous);
       toast.error("Update failed");
-    }
-  };
+    },
+    onSuccess: (_data, vars) => {
+      toast.success(vars.isVerified ? "Showroom verified" : "Verification removed");
+    },
+  });
 
   const columns: ColumnDef<AdminShowroom>[] = [
     {
@@ -54,13 +68,17 @@ export default function ShowroomsPage() {
       ),
     },
     { accessorKey: "ownerName", header: "Owner", cell: ({ getValue }) => <span className="text-sm">{(getValue() as string) || "—"}</span> },
-    { accessorKey: "phone", header: "Phone" },
+    { accessorKey: "phone", header: "Phone", cell: ({ getValue }) => <span className="font-mono tabular-nums" dir="ltr">{getValue() as string}</span> },
     { accessorKey: "address", header: "Address", cell: ({ getValue }) => <span className="max-w-[200px] truncate block">{getValue() as string}</span> },
     {
       accessorKey: "isVerified", header: "Verified", enableSorting: false,
       cell: ({ row }) => (
         <div onClick={(e) => e.stopPropagation()}>
-          <Switch checked={row.original.isVerified} onCheckedChange={(v) => handleVerify(row.original.id, v)} aria-label={`Toggle verified for ${row.original.name}`} />
+          <Switch
+            checked={row.original.isVerified}
+            onCheckedChange={(v) => verifyMutation.mutate({ id: row.original.id, isVerified: v })}
+            aria-label={`Toggle verified for ${row.original.name}`}
+          />
         </div>
       ),
     },
@@ -81,7 +99,7 @@ export default function ShowroomsPage() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Showrooms Management</h1>
 
-      <DataTable columns={columns} data={showrooms} loading={loading} onRowClick={(row) => setViewDialog(row)} emptyMessage="No showrooms found" />
+      <DataTable columns={columns} data={showrooms} loading={listQuery.isLoading} onRowClick={(row) => setViewDialog(row)} emptyMessage="No showrooms found" />
 
       <Dialog open={!!viewDialog} onOpenChange={() => setViewDialog(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg">
@@ -105,15 +123,15 @@ export default function ShowroomsPage() {
               {viewDialog.coverUrl && <div className="rounded-lg overflow-hidden"><img src={viewDialog.coverUrl} alt={`${viewDialog.name} cover`} className="w-full h-32 object-cover" /></div>}
               {viewDialog.description && <div><h4 className="text-xs text-muted-foreground mb-1">Description</h4><p className="text-sm">{viewDialog.description}</p></div>}
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="flex items-start gap-1.5"><Phone className="h-4 w-4 text-muted-foreground mt-0.5" /><div><div className="text-xs text-muted-foreground">Phone</div><div className="font-medium">{viewDialog.phone}</div></div></div>
-                {viewDialog.whatsappBusiness && <div><div className="text-xs text-muted-foreground">WhatsApp Business</div><div className="font-medium">{viewDialog.whatsappBusiness}</div></div>}
+                <div className="flex items-start gap-1.5"><Phone className="h-4 w-4 text-muted-foreground mt-0.5" /><div><div className="text-xs text-muted-foreground">Phone</div><div className="font-medium font-mono tabular-nums" dir="ltr">{viewDialog.phone}</div></div></div>
+                {viewDialog.whatsappBusiness && <div><div className="text-xs text-muted-foreground">WhatsApp Business</div><div className="font-medium font-mono tabular-nums" dir="ltr">{viewDialog.whatsappBusiness}</div></div>}
                 {viewDialog.website && <div className="flex items-start gap-1.5"><Globe className="h-4 w-4 text-muted-foreground mt-0.5" /><div><div className="text-xs text-muted-foreground">Website</div><div className="font-medium truncate max-w-[180px]">{viewDialog.website}</div></div></div>}
                 <div className="flex items-start gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground mt-0.5" /><div><div className="text-xs text-muted-foreground">Address</div><div className="font-medium">{viewDialog.address}</div></div></div>
               </div>
               <div className="border-t pt-3 text-sm">
                 <div className="text-xs text-muted-foreground mb-1">Owner</div>
                 <div className="font-medium">{viewDialog.ownerName || "—"}</div>
-                {viewDialog.ownerEmail && <div className="text-xs text-muted-foreground">{viewDialog.ownerEmail}</div>}
+                {viewDialog.ownerEmail && <div className="text-xs text-muted-foreground" dir="ltr">{viewDialog.ownerEmail}</div>}
               </div>
               <div className="text-xs text-muted-foreground border-t pt-3">Created {new Date(viewDialog.createdAt).toLocaleDateString()}</div>
             </>

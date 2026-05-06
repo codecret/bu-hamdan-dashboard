@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard } from "lucide-react";
@@ -11,32 +12,20 @@ import type { AdminTransaction } from "@/types";
 import { PAGE_LIMIT } from "@/types";
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const abortRef = useRef<AbortController | null>(null);
 
-  const fetchData = useCallback(async () => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setLoading(true);
-    try {
-      const res = await transactionsApi.list({ page, limit: PAGE_LIMIT });
-      if (controller.signal.aborted) return;
-      setTransactions(res.data);
-      setTotal(res.total);
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      toast.error("Failed to load transactions");
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
-    }
-  }, [page]);
+  const query = useQuery({
+    queryKey: ["admin", "transactions", { page }],
+    queryFn: () => transactionsApi.list({ page, limit: PAGE_LIMIT }),
+    placeholderData: keepPreviousData,
+  });
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    if (query.isError) toast.error("Failed to load transactions");
+  }, [query.isError]);
 
+  const transactions = query.data?.data ?? [];
+  const total = query.data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_LIMIT);
 
   const columns: ColumnDef<AdminTransaction>[] = [
@@ -60,7 +49,7 @@ export default function TransactionsPage() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Transactions</h1>
-      <DataTable columns={columns} data={transactions} loading={loading} page={page} totalPages={totalPages} total={total} onPageChange={setPage} emptyIcon={<CreditCard className="h-12 w-12" />} emptyMessage="No transactions yet" />
+      <DataTable columns={columns} data={transactions} loading={query.isLoading} page={page} totalPages={totalPages} total={total} onPageChange={setPage} emptyIcon={<CreditCard className="h-12 w-12" />} emptyMessage="No transactions yet" />
     </div>
   );
 }

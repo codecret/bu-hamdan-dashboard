@@ -142,6 +142,8 @@ export interface UserProfile {
 export interface UserDetail extends User {
   profile: UserProfile | null;
   listings: Listing[];
+  subscription: UserSubscriptionSummary | null;
+  activeCredits: number;
 }
 
 export interface AdminShowroom extends Showroom {
@@ -177,4 +179,49 @@ export interface AnalyticsOverview {
   totalShowrooms: number;
   totalConversations: number;
   totalRevenue: number;
+  activeSubscriptions: number;
+  subscriptionsByTier: Record<string, number>;
+  paymentsRevenue: number;
+}
+
+export type PlanTier = "regular_single" | "showroom_monthly" | "dealer_monthly";
+export type SubscriptionStatus =
+  | "trial"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "expired";
+
+export interface AdminSubscription {
+  id: string;
+  userId: string;
+  status: SubscriptionStatus;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+  createdAt: string;
+  tier: PlanTier;
+  planNameAr: string;
+  planNameEn: string;
+  planPriceKwd: string;
+  listingQuota: number;
+  userName: string | null;
+  userEmail: string | null;
+  userPhone: string | null;
+  userAccountType: string | null;
+}
+
+export interface UserSubscriptionSummary {
+  id: string;
+  status: SubscriptionStatus;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+  createdAt: string;
+  tier: PlanTier;
+  planNameAr: string;
+  planNameEn: string;
+  planPriceKwd: string;
+  planQuota: number;
+  isActive: boolean;
 }

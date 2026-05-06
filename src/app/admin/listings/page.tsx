@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,7 @@ import { Check, X, Trash2, ChevronLeft, ChevronRight, Star, StarOff, Eye, Search
 import { DataTable } from "@/components/ui/data-table";
 import { listingsApi } from "@/lib/admin-api";
 import { toast } from "sonner";
-import type { AdminListing, AdminListingDetail, ListingImage, ListingFeature } from "@/types";
+import type { AdminListing, ListingImage, ListingFeature } from "@/types";
 import { PAGE_LIMIT } from "@/types";
 
 const STATUS_TABS = ["all", "pending", "active", "rejected", "sold"] as const;
@@ -49,106 +50,107 @@ function ImgWithFallback({ src, alt, className }: { src: string; alt: string; cl
 }
 
 export default function ListingsPage() {
-  const [listings, setListings] = useState<AdminListing[]>([]);
-  const [total, setTotal] = useState(0);
+  const qc = useQueryClient();
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [status, setStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [loading, setLoading] = useState(true);
   const [actionDialog, setActionDialog] = useState<{ id: string; action: string } | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
   const [promoDialog, setPromoDialog] = useState<{ id: string; isFeatured: boolean } | null>(null);
   const [promoDays, setPromoDays] = useState("30");
-  const [viewDialog, setViewDialog] = useState<AdminListingDetail | null>(null);
-  const [viewLoading, setViewLoading] = useState(false);
+  const [viewId, setViewId] = useState<string | null>(null);
   const [viewImageIndex, setViewImageIndex] = useState(0);
-  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
 
-  const fetchListings = useCallback(async () => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setLoading(true);
-    try {
+  // ── List query ──────────────────────────────────────────
+  const listQuery = useQuery({
+    queryKey: ["admin", "listings", { page, status, search: debouncedSearch }],
+    queryFn: () => {
       const params: Record<string, string | number> = { page, limit: PAGE_LIMIT };
       if (status !== "all") params.status = status;
       if (debouncedSearch) params.search = debouncedSearch;
-      const res = await listingsApi.list(params);
-      if (controller.signal.aborted) return;
-      setListings(res.data);
-      setTotal(res.total);
-      setTotalPages(res.totalPages);
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      toast.error("Failed to load listings");
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
-    }
-  }, [page, status, debouncedSearch]);
+      return listingsApi.list(params);
+    },
+    placeholderData: keepPreviousData,
+  });
 
-  useEffect(() => { fetchListings(); }, [fetchListings]);
+  useEffect(() => {
+    if (listQuery.isError) toast.error("Failed to load listings");
+  }, [listQuery.isError]);
 
-  const handleViewAd = async (id: string) => {
-    setViewLoading(true);
-    setViewDialog(null);
+  const listings = listQuery.data?.data ?? [];
+  const total = listQuery.data?.total ?? 0;
+  const totalPages = listQuery.data?.totalPages ?? 1;
+
+  const invalidateList = () =>
+    qc.invalidateQueries({ queryKey: ["admin", "listings"] });
+
+  // ── Detail query (enabled when a row is selected) ───────
+  const detailQuery = useQuery({
+    queryKey: ["admin", "listing", viewId],
+    queryFn: () => listingsApi.get(viewId as string),
+    enabled: !!viewId,
+  });
+
+  useEffect(() => {
+    if (detailQuery.isError) toast.error("Failed to load listing details");
+  }, [detailQuery.isError]);
+
+  const viewDialog = detailQuery.data ?? null;
+  const viewLoading = !!viewId && detailQuery.isLoading;
+
+  const handleViewAd = (id: string) => {
     setViewImageIndex(0);
-    try {
-      const data = await listingsApi.get(id);
-      setViewDialog(data);
-    } catch {
-      toast.error("Failed to load listing details");
-    } finally {
-      setViewLoading(false);
-    }
+    setViewId(id);
   };
 
-  const handleAction = async () => {
-    if (!actionDialog) return;
-    setActionLoading(true);
-    try {
+  // ── Status / delete mutation ────────────────────────────
+  const actionMutation = useMutation({
+    mutationFn: async () => {
+      if (!actionDialog) throw new Error("No action target");
       if (actionDialog.action === "delete") {
-        await listingsApi.delete(actionDialog.id);
-        toast.success("Listing deleted");
-      } else {
-        await listingsApi.updateStatus(actionDialog.id, actionDialog.action);
-        toast.success(`Listing ${actionDialog.action === "active" ? "approved" : "rejected"}`);
+        return listingsApi.delete(actionDialog.id);
       }
+      return listingsApi.updateStatus(actionDialog.id, actionDialog.action);
+    },
+    onSuccess: () => {
+      const a = actionDialog?.action;
+      toast.success(
+        a === "delete"
+          ? "Listing deleted"
+          : `Listing ${a === "active" ? "approved" : "rejected"}`,
+      );
       setActionDialog(null);
-      fetchListings();
-    } catch {
-      toast.error("Action failed");
-    } finally {
-      setActionLoading(false);
-    }
-  };
+      invalidateList();
+    },
+    onError: () => toast.error("Action failed"),
+  });
 
-  const handlePromo = async () => {
-    if (!promoDialog) return;
-    setActionLoading(true);
-    try {
-      if (promoDialog.isFeatured) {
-        await listingsApi.toggleFeatured(promoDialog.id, false);
-        toast.success("تم إلغاء ترويج الإعلان");
-      } else {
-        await listingsApi.toggleFeatured(promoDialog.id, true, parseInt(promoDays));
-        toast.success(`تم ترويج الإعلان لمدة ${promoDays} يوم`);
-      }
+  // ── Featured / promote mutation ─────────────────────────
+  const promoMutation = useMutation({
+    mutationFn: async () => {
+      if (!promoDialog) throw new Error("No promo target");
+      return promoDialog.isFeatured
+        ? listingsApi.toggleFeatured(promoDialog.id, false)
+        : listingsApi.toggleFeatured(promoDialog.id, true, parseInt(promoDays));
+    },
+    onSuccess: () => {
+      toast.success(
+        promoDialog?.isFeatured
+          ? "تم إلغاء ترويج الإعلان"
+          : `تم ترويج الإعلان لمدة ${promoDays} يوم`,
+      );
       setPromoDialog(null);
       setPromoDays("30");
-      fetchListings();
-    } catch {
-      toast.error("فشل تحديث الترويج");
-    } finally {
-      setActionLoading(false);
-    }
-  };
+      invalidateList();
+    },
+    onError: () => toast.error("فشل تحديث الترويج"),
+  });
+
 
   const columns: ColumnDef<AdminListing>[] = [
     {
@@ -279,7 +281,7 @@ export default function ListingsPage() {
       <DataTable
         columns={columns}
         data={listings}
-        loading={loading}
+        loading={listQuery.isLoading}
         page={page}
         totalPages={totalPages}
         total={total}
@@ -289,7 +291,7 @@ export default function ListingsPage() {
       />
 
       {/* View Ad Dialog */}
-      <Dialog open={!!viewDialog || viewLoading} onOpenChange={() => { setViewDialog(null); setViewImageIndex(0); }}>
+      <Dialog open={!!viewId} onOpenChange={(open) => { if (!open) { setViewId(null); setViewImageIndex(0); } }}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           {viewLoading ? (
             <div className="space-y-4 py-8">
@@ -409,8 +411,8 @@ export default function ListingsPage() {
           <p className="text-sm text-muted-foreground">This action cannot be easily undone.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setActionDialog(null)}>Cancel</Button>
-            <Button variant={actionDialog?.action === "active" ? "default" : "destructive"} onClick={handleAction} disabled={actionLoading}>
-              {actionLoading ? "Processing..." : "Confirm"}
+            <Button variant={actionDialog?.action === "active" ? "default" : "destructive"} onClick={() => actionMutation.mutate()} disabled={actionMutation.isPending}>
+              {actionMutation.isPending ? "Processing..." : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -439,8 +441,8 @@ export default function ListingsPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setPromoDialog(null)}>إلغاء</Button>
-            <Button variant={promoDialog?.isFeatured ? "destructive" : "default"} onClick={handlePromo} disabled={actionLoading} className={!promoDialog?.isFeatured ? "bg-yellow-500 hover:bg-yellow-600" : ""}>
-              {actionLoading ? "جاري..." : promoDialog?.isFeatured ? 'إلغاء الترويج' : 'ترويج'}
+            <Button variant={promoDialog?.isFeatured ? "destructive" : "default"} onClick={() => promoMutation.mutate()} disabled={promoMutation.isPending} className={!promoDialog?.isFeatured ? "bg-yellow-500 hover:bg-yellow-600" : ""}>
+              {promoMutation.isPending ? "جاري..." : promoDialog?.isFeatured ? 'إلغاء الترويج' : 'ترويج'}
             </Button>
           </DialogFooter>
         </DialogContent>
