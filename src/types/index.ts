@@ -51,6 +51,13 @@ export interface Model {
   nameEn: string;
 }
 
+export interface Trim {
+  id: string;
+  modelId: string;
+  name: string;
+  nameEn: string;
+}
+
 export interface Showroom {
   id: string;
   userId: string;

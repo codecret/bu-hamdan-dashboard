@@ -6,7 +6,7 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Sparkles, AlertCircle } from "lucide-react";
+import { Search, AlertCircle } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { subscriptionsApi } from "@/lib/admin-api";
 import { toast } from "sonner";
@@ -153,10 +153,7 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Sparkles className="h-6 w-6 text-violet-600" />
-        <h1 className="text-2xl font-bold">Subscriptions</h1>
-      </div>
+      <h1 className="text-2xl font-bold">Subscriptions</h1>
 
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[220px]">

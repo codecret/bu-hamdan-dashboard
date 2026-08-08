@@ -4,6 +4,7 @@ import type {
   Listing,
   Make,
   Model,
+  Trim,
   Showroom,
   Transaction,
   PaginatedResponse,
@@ -61,6 +62,10 @@ export const catalogApi = {
   createModel: (data: Partial<Omit<Model, "id">>) => api.post<Model>("/admin/catalog/models", data).then((r) => r.data),
   updateModel: (id: string, data: Partial<Model>) => api.patch<Model>(`/admin/catalog/models/${id}`, data).then((r) => r.data),
   deleteModel: (id: string) => api.delete(`/admin/catalog/models/${id}`),
+  getTrims: (modelId: string) => api.get<Trim[]>(`/catalog/models/${modelId}/trims`).then((r) => r.data),
+  createTrim: (data: Partial<Omit<Trim, "id">>) => api.post<Trim>("/admin/catalog/trims", data).then((r) => r.data),
+  updateTrim: (id: string, data: Partial<Trim>) => api.patch<Trim>(`/admin/catalog/trims/${id}`, data).then((r) => r.data),
+  deleteTrim: (id: string) => api.delete(`/admin/catalog/trims/${id}`),
 };
 
 // Upload helpers
