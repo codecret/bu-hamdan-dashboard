@@ -5,10 +5,10 @@
  * support and privacy contacts on an App Store listing actually reach someone,
  * and a bounce here is a rejection.
  */
-export const SUPPORT_EMAIL = "support@bohamdan.cloud";
+export { SUPPORT_EMAIL } from "@/lib/business-info";
 
 /** Update when the text materially changes — users are told to check it. */
-export const LAST_UPDATED = "٨ أغسطس ٢٠٢٦";
+export const LAST_UPDATED = "١٣ أكتوبر ٢٠٢٦";
 
 export function PageTitle({ title }: { title: string }) {
   return (
