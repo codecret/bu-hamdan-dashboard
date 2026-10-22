@@ -1,3 +1,4 @@
+import type { HomeBanner, HomeBannerInput } from '@/types/home-banner';
 import api from "./api";
 import type {
   User,
@@ -70,6 +71,16 @@ export const catalogApi = {
 
 // Upload helpers
 export const uploadApi = {
+  uploadBanner: async (file: File): Promise<{ url: string }> => {
+    const formData = new FormData();
+    formData.append('images', file);
+    const res = await api.post<{ url: string }[]>('/upload/images', formData, {
+      headers: { 'Content-Type': undefined as unknown as string },
+    });
+    if (!res.data?.[0]?.url) throw new Error('Upload returned no image');
+    return res.data[0];
+  },
+
   // Logo upload — preserves PNG/WebP alpha, no thumbnail. For brand/showroom marks.
   uploadLogo: async (file: File): Promise<{ url: string }> => {
     const formData = new FormData();
@@ -81,6 +92,14 @@ export const uploadApi = {
     if (!res.data?.url) throw new Error("Upload returned no URL");
     return res.data;
   },
+};
+
+export const homeBannersApi = {
+  list: () => api.get<HomeBanner[]>('/admin/home-banners').then(r => r.data),
+  create: (data: HomeBannerInput) => api.post<HomeBanner>('/admin/home-banners', data).then(r => r.data),
+  update: (id: string, data: HomeBannerInput) => api.put<HomeBanner>(`/admin/home-banners/${id}`, data).then(r => r.data),
+  setActive: (id: string, isActive: boolean) => api.patch<HomeBanner>(`/admin/home-banners/${id}/active`, { isActive }).then(r => r.data),
+  remove: (id: string) => api.delete(`/admin/home-banners/${id}`).then(() => undefined),
 };
 
 // Showrooms

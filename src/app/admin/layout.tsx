@@ -15,6 +15,7 @@ import {
   Sparkles,
   LogOut,
   ChevronDown,
+  PanelsTopLeft,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,7 @@ const navItems = [
   { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { title: "Users", href: "/admin/users", icon: Users },
   { title: "Listings", href: "/admin/listings", icon: Car },
+  { title: "Home banners", href: "/admin/banners", icon: PanelsTopLeft },
   { title: "Catalog", href: "/admin/catalog", icon: BookOpen },
   { title: "Showrooms", href: "/admin/showrooms", icon: Building2 },
   { title: "Subscriptions", href: "/admin/subscriptions", icon: Sparkles },
