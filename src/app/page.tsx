@@ -102,7 +102,7 @@ export default function HomePage() {
         <section id="contact" className={`${styles.container} ${styles.contact}`} aria-labelledby="contact-title">
           <div><span className={styles.kicker}>نحن قريبون</span><h2 id="contact-title">عندك سؤال؟<br />خلّنا نتواصل.</h2><a className={styles.emailLink} href={`mailto:${SUPPORT_EMAIL}`} dir="ltr">{SUPPORT_EMAIL} <ArrowUpLeft size={26} aria-hidden="true" /></a><p>دعم التطبيق، استفسارات المعارض، وطلبات الخصوصية.</p></div>
           <div className={styles.questions}>
-            <details><summary>هل نشر الإعلانات مجاني؟</summary><p>نعم، النشر مجاني حالياً للأفراد والمعارض والوكلاء. تخضع الإعلانات للمراجعة قبل ظهورها للعامة.</p></details>
+            <details><summary>هل نشر الإعلانات مجاني؟</summary><p>نعم، النشر مجاني حالياً للأفراد والمعارض والوكلاء. تظهر الإعلانات مباشرة بعد النشر، وتُزال الإعلانات المخالفة لشروط الاستخدام.</p></details>
             <details><summary>متى أستطيع تحميل التطبيق؟</summary><p>التطبيق قيد التجهيز للإطلاق. سنضيف روابط iOS وAndroid الرسمية إلى هذا الموقع عند توفر التطبيق في المتاجر.</p></details>
             <details><summary>كيف تُستخدم رسائل التحقق؟</summary><p>تُرسل رموز التحقق عند طلبها داخل التطبيق للتحقق من رقم الهاتف أو استعادة الحساب. لا نستخدمها لإرسال رسائل تسويقية.</p></details>
             <Link href="/help" className={styles.helpLink}>المزيد في مركز المساعدة <ArrowUpLeft size={18} aria-hidden="true" /></Link>
