@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Crop, Loader2, RotateCcw } from 'lucide-react';
+import { Crop, Loader2, Maximize, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -22,7 +22,11 @@ export type BannerCrop = { file: File; source: CropSource; view: CropView };
 function cropRect(size: Size, view: CropView): CropRect {
   const width = Math.min(size.width, size.height * ASPECT) / view.zoom;
   const height = width / ASPECT;
-  return { width, height, x: (size.width - width) * view.x, y: (size.height - height) * view.y };
+  return {
+    width, height,
+    x: (size.width - width) * (width > size.width ? 0.5 : view.x),
+    y: (size.height - height) * (height > size.height ? 0.5 : view.y),
+  };
 }
 
 async function loadArtwork(source: CropSource, signal: AbortSignal) {
@@ -49,6 +53,14 @@ function createArtwork(image: HTMLImageElement, crop: CropRect): Promise<File> {
   context.fillStyle = '#002B70';
   context.fillRect(0, 0, WIDTH, HEIGHT);
   context.imageSmoothingQuality = 'high';
+  if (crop.width > image.naturalWidth || crop.height > image.naturalHeight) {
+    const background = cropRect({ width: image.naturalWidth, height: image.naturalHeight }, CENTER);
+    context.save();
+    context.globalAlpha = 0.75;
+    context.filter = 'blur(24px)';
+    context.drawImage(image, background.x, background.y, background.width, background.height, -60, -30, WIDTH + 120, HEIGHT + 60);
+    context.restore();
+  }
   context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, WIDTH, HEIGHT);
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => blob ? resolve(new File([blob], 'banner-1200x450.jpg', { type: 'image/jpeg' })) : reject(new Error('Could not prepare the crop.')), 'image/jpeg', 0.93);
@@ -94,6 +106,9 @@ export function BannerCropDialog({ source, initialView = CENTER, mixedCarousel, 
   const phoneAspect = mixedCarousel ? 360 / 148 : ASPECT;
   const phoneWidth = crop ? crop.height * phoneAspect : 0;
   const phoneCrop = crop && { ...crop, width: phoneWidth, x: crop.x + (crop.width - phoneWidth) / 2 };
+  const fillsFrame = !!(crop && size && crop.width <= size.width && crop.height <= size.height);
+  const safeAspect = mixedCarousel ? 288 / 148 : ASPECT;
+  const fitZoom = size ? Math.min(size.width, size.height * ASPECT) / Math.max(size.width * ASPECT / safeAspect, size.height * ASPECT) : 1;
 
   function startDrag(event: PointerEvent<HTMLDivElement>) {
     if ((!canMoveX && !canMoveY) || !event.isPrimary || event.button !== 0) return;
@@ -139,9 +154,13 @@ export function BannerCropDialog({ source, initialView = CENTER, mixedCarousel, 
 
       <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="min-w-0 space-y-3">
-          <p className="text-xs font-semibold tracking-wide text-slate-600">CROP AREA · 8:3</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold tracking-wide text-slate-600">CROP AREA · 8:3</p>
+            <Button type="button" variant="outline" className="h-11" disabled={!size || applying} onClick={() => setView({ ...CENTER, zoom: fitZoom })}><Maximize size={15} /> Fit full image</Button>
+          </div>
           <div className={`relative isolate aspect-[8/3] overflow-hidden rounded-xl bg-[#002B70] ring-1 ring-slate-200 ${canMoveX || canMoveY ? 'touch-none cursor-grab active:cursor-grabbing' : ''}`}
             onPointerDown={startDrag} onPointerMove={moveDrag} onLostPointerCapture={() => { drag.current = null; }}>
+            {size && !fillsFrame && <img src={url} alt="" aria-hidden className="pointer-events-none absolute inset-0 size-full scale-110 object-cover opacity-75 blur-md" />}
             {url && <img ref={image} src={url} alt="" draggable={false} className="pointer-events-none absolute max-w-none select-none"
               style={crop && size ? imageStyle(crop, size) : { visibility: 'hidden' }}
               onLoad={event => setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
@@ -151,7 +170,7 @@ export function BannerCropDialog({ source, initialView = CENTER, mixedCarousel, 
           </div>
           <div className="grid gap-2.5">
             <label className="grid grid-cols-[5.5rem_minmax(0,1fr)_2.8rem] items-center gap-2 text-xs font-medium">
-              Zoom <input aria-label="Zoom" className="h-8 w-full accent-[#002B70]" type="range" min="1" max="3" step="0.01" disabled={!size || applying} value={view.zoom} onChange={event => setView({ ...view, zoom: Number(event.target.value) })} />
+              Zoom <input aria-label="Zoom" className="h-8 w-full accent-[#002B70]" type="range" min={Math.min(0.25, fitZoom)} max="3" step="any" disabled={!size || applying} value={view.zoom} onChange={event => setView({ ...view, zoom: Number(event.target.value) })} />
               <span className="text-right tabular-nums text-slate-500">{Math.round(view.zoom * 100)}%</span>
             </label>
             {(['x', 'y'] as const).map(axis => <label key={axis} className="grid grid-cols-[5.5rem_minmax(0,1fr)_2.8rem] items-center gap-2 text-xs font-medium">
@@ -163,9 +182,10 @@ export function BannerCropDialog({ source, initialView = CENTER, mixedCarousel, 
         <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="mb-2 text-xs font-semibold tracking-wide text-slate-600">APP PREVIEW</p>
           <div className="relative overflow-hidden rounded-xl bg-[#002B70]" style={{ aspectRatio: phoneAspect }}>
+            {size && !fillsFrame && <img src={url} alt="" aria-hidden className="absolute inset-0 size-full scale-110 object-cover opacity-75 blur-md" />}
             {size && phoneCrop && <img src={url} alt="Cropped banner in the app" className="absolute max-w-none" style={imageStyle(phoneCrop, size)} />}
           </div>
-          <p className="mt-2 text-xs leading-5 text-slate-600">{mixedCarousel ? 'Text banners are active. On a typical phone, the app trims a little from each side to match their height.' : 'Preview of the artwork in the home carousel.'}</p>
+          <p className="mt-2 text-xs leading-5 text-slate-600">{mixedCarousel ? 'Text banners make the frame taller on phones. Use Fit full image to keep text and logos inside the visible area.' : 'Preview of the artwork in the home carousel.'}</p>
         </div>
       </div>
       {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
