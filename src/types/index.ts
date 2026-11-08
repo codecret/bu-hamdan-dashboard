@@ -154,6 +154,7 @@ export interface UserDetail extends User {
 }
 
 export interface AdminShowroom extends Showroom {
+  isPublished: boolean;
   logoUrl: string | null;
   coverUrl: string | null;
   whatsappBusiness: string | null;

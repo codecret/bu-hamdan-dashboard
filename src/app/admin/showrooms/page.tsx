@@ -28,24 +28,17 @@ export default function ShowroomsPage() {
 
   const showrooms = listQuery.data ?? [];
 
-  const verifyMutation = useMutation({
-    mutationFn: (vars: { id: string; isVerified: boolean }) =>
-      showroomsApi.update(vars.id, { isVerified: vars.isVerified }),
-    onMutate: async ({ id, isVerified }) => {
-      // Optimistic update — flip the toggle instantly, roll back on error
-      await qc.cancelQueries({ queryKey: ["admin", "showrooms"] });
-      const previous = qc.getQueryData<AdminShowroom[]>(["admin", "showrooms"]);
-      qc.setQueryData<AdminShowroom[]>(["admin", "showrooms"], (old) =>
-        old?.map((s) => (s.id === id ? { ...s, isVerified } : s)) ?? [],
-      );
-      return { previous };
-    },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(["admin", "showrooms"], ctx.previous);
-      toast.error("Update failed");
-    },
-    onSuccess: (_data, vars) => {
-      toast.success(vars.isVerified ? "Showroom verified" : "Verification removed");
+  const updateShowroom = useMutation({
+    mutationFn: ({ id, ...changes }: { id: string; isVerified?: boolean; isPublished?: boolean }) =>
+      showroomsApi.update(id, changes),
+    onError: () => toast.error("Update failed"),
+    onSuccess: async (saved, changes) => {
+      await qc.invalidateQueries({ queryKey: ["admin", "showrooms"] });
+      if (changes.isPublished !== undefined) {
+        toast.success(saved.isPublished ? "Showroom published" : "Showroom hidden");
+      } else {
+        toast.success(saved.isVerified ? "Verification badge added" : "Verification badge removed");
+      }
     },
   });
 
@@ -71,13 +64,27 @@ export default function ShowroomsPage() {
     { accessorKey: "phone", header: "Phone", cell: ({ getValue }) => <span className="font-mono tabular-nums" dir="ltr">{getValue() as string}</span> },
     { accessorKey: "address", header: "Address", cell: ({ getValue }) => <span className="max-w-[200px] truncate block">{getValue() as string}</span> },
     {
-      accessorKey: "isVerified", header: "Verified", enableSorting: false,
+      accessorKey: "isPublished", header: "In directory", enableSorting: false,
+      cell: ({ row }) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Switch
+            checked={row.original.isPublished}
+            disabled={updateShowroom.isPending}
+            onCheckedChange={(isPublished) => updateShowroom.mutate({ id: row.original.id, isPublished })}
+            aria-label={`Show ${row.original.name} in the directory`}
+          />
+        </div>
+      ),
+    },
+    {
+      accessorKey: "isVerified", header: "Verified badge", enableSorting: false,
       cell: ({ row }) => (
         <div onClick={(e) => e.stopPropagation()}>
           <Switch
             checked={row.original.isVerified}
-            onCheckedChange={(v) => verifyMutation.mutate({ id: row.original.id, isVerified: v })}
-            aria-label={`Toggle verified for ${row.original.name}`}
+            disabled={updateShowroom.isPending}
+            onCheckedChange={(isVerified) => updateShowroom.mutate({ id: row.original.id, isVerified })}
+            aria-label={`Show verification badge for ${row.original.name}`}
           />
         </div>
       ),
@@ -116,7 +123,8 @@ export default function ShowroomsPage() {
                   <h3 className="text-lg font-semibold">{viewDialog.name}</h3>
                   {viewDialog.nameEn && <p className="text-sm text-muted-foreground">{viewDialog.nameEn}</p>}
                   <div className="flex gap-2 mt-1">
-                    {viewDialog.isVerified ? <Badge className="bg-green-100 text-green-800">Verified</Badge> : <Badge variant="outline">Not Verified</Badge>}
+                    <Badge variant={viewDialog.isPublished ? "secondary" : "outline"}>{viewDialog.isPublished ? "In directory" : "Hidden"}</Badge>
+                    {viewDialog.isVerified && <Badge className="bg-green-100 text-green-800">Verified</Badge>}
                   </div>
                 </div>
               </div>

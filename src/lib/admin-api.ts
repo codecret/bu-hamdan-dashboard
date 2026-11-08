@@ -105,8 +105,8 @@ export const homeBannersApi = {
 // Showrooms
 export const showroomsApi = {
   list: () => api.get<AdminShowroom[]>("/admin/showrooms").then((r) => r.data),
-  update: (id: string, data: Partial<Pick<Showroom, "isVerified">>) =>
-    api.patch<Showroom>(`/admin/showrooms/${id}`, data).then((r) => r.data),
+  update: (id: string, data: Partial<Pick<AdminShowroom, "isVerified" | "isPublished">>) =>
+    api.patch<Showroom & Pick<AdminShowroom, "isPublished">>(`/admin/showrooms/${id}`, data).then((r) => r.data),
 };
 
 // Notifications
