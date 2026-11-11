@@ -45,7 +45,7 @@ function errorMessage(error: unknown) {
 
 export function BannerPreview({ banner }: { banner: HomeBannerInput }) {
   return <div className={`relative flex flex-col justify-center overflow-hidden rounded-2xl bg-[#002B70] text-white ${banner.imageUrl ? 'aspect-[8/3]' : 'min-h-[160px]'}`} dir="rtl">
-    {banner.imageUrl ? <img src={banner.imageUrl} alt={banner.titleAr || 'Banner artwork'} className="absolute inset-0 h-full w-full object-cover" />
+    {banner.imageUrl ? <img src={banner.imageUrl} alt={banner.titleAr || 'Banner artwork'} className="absolute inset-0 h-full w-full object-contain" />
       : <div className="relative space-y-1 px-5 pb-5 pt-9">
         <p className="line-clamp-2 text-lg font-bold">{banner.titleAr || 'عنوان إعلانك هنا'}</p>
         {banner.bodyAr && <p className="line-clamp-2 text-xs leading-6 text-blue-100">{banner.bodyAr}</p>}
@@ -66,7 +66,6 @@ export function HomeBannersManager({ apiClient = homeBannersApi }: { apiClient?:
   const [archiveId, setArchiveId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const banners = query.data ?? [];
-  const mixedCarousel = banners.some(banner => banner.id !== selected && !banner.imageUrl && status(banner) === 'Live');
   const preview = { ...form, imageUrl: artwork?.previewUrl ?? form.imageUrl };
   const locked = saving || !!busyId || cropSource !== null;
   const patch = <K extends keyof HomeBannerInput>(key: K, value: HomeBannerInput[K]) => setForm(previous => ({ ...previous, [key]: value }));
@@ -182,7 +181,7 @@ export function HomeBannersManager({ apiClient = homeBannersApi }: { apiClient?:
               <Button type="button" variant="ghost" onClick={() => setImageUrl(null)} className="h-11">Remove image</Button>
             </div>}
             <BannerPreview banner={preview} />
-            <p className="text-xs leading-5 text-slate-500">{artwork ? 'Crop ready. Save the banner to upload the new artwork.' : 'Keep important text and logos away from the edges.'}</p>
+            <p className="text-xs leading-5 text-slate-500">{artwork ? 'Artwork ready. Save the banner to upload it.' : 'Recommended size: 1200 × 450 px. The app fits the whole image.'}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="banner-action">Tap action</Label><select id="banner-action" value={form.actionType} onChange={e => { patch('actionType', e.target.value as HomeBannerInput['actionType']); patch('actionValue', null); }} className="mt-2 h-11 w-full rounded-lg border bg-white px-3 text-sm">{actions.map(action => <option key={action.value} value={action.value}>{action.label}</option>)}</select></div>
             {['external', 'listing', 'showroom'].includes(form.actionType) && <div><Label htmlFor="banner-target">{form.actionType === 'external' ? 'Partner website URL *' : `${form.actionType === 'listing' ? 'Listing' : 'Showroom'} ID *`}</Label><Input id="banner-target" required type={form.actionType === 'external' ? 'url' : 'text'} pattern={form.actionType === 'external' ? 'https://.*' : undefined} value={form.actionValue || ''} onChange={e => patch('actionValue', e.target.value || null)} placeholder={form.actionType === 'external' ? 'https://partner.example' : 'UUID'} className="mt-2 h-11" /></div>}</div>
@@ -194,6 +193,6 @@ export function HomeBannersManager({ apiClient = homeBannersApi }: { apiClient?:
         <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-slate-50/70 px-5 py-4"><p className="text-xs text-slate-500">Changes reach open apps within about a minute.</p><Button type="submit" disabled={locked} className="h-11 bg-[#002B70] px-5">{saving && <Loader2 className="animate-spin" />}{saving ? 'Saving…' : 'Save banner'}</Button></div>
       </form>
     </div>
-    {cropSource && <BannerCropDialog source={cropSource} initialView={artwork?.source === cropSource ? artwork.view : undefined} mixedCarousel={mixedCarousel} onCancel={() => setCropSource(null)} onApply={applyCrop} />}
+    {cropSource && <BannerCropDialog source={cropSource} initialView={artwork?.source === cropSource ? artwork.view : undefined} onCancel={() => setCropSource(null)} onApply={applyCrop} />}
   </div>;
 }

@@ -53,30 +53,22 @@ function createArtwork(image: HTMLImageElement, crop: CropRect): Promise<File> {
   context.fillStyle = '#002B70';
   context.fillRect(0, 0, WIDTH, HEIGHT);
   context.imageSmoothingQuality = 'high';
-  if (crop.width > image.naturalWidth || crop.height > image.naturalHeight) {
-    const background = cropRect({ width: image.naturalWidth, height: image.naturalHeight }, CENTER);
-    context.save();
-    context.globalAlpha = 0.75;
-    context.filter = 'blur(24px)';
-    context.drawImage(image, background.x, background.y, background.width, background.height, -60, -30, WIDTH + 120, HEIGHT + 60);
-    context.restore();
-  }
-  context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, WIDTH, HEIGHT);
+  const scale = WIDTH / crop.width;
+  context.drawImage(image, -crop.x * scale, -crop.y * scale, image.naturalWidth * scale, image.naturalHeight * scale);
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => blob ? resolve(new File([blob], 'banner-1200x450.jpg', { type: 'image/jpeg' })) : reject(new Error('Could not prepare the crop.')), 'image/jpeg', 0.93);
   });
 }
 
-export function BannerCropDialog({ source, initialView = CENTER, mixedCarousel, onCancel, onApply }: {
+export function BannerCropDialog({ source, initialView, onCancel, onApply }: {
   source: CropSource;
   initialView?: CropView;
-  mixedCarousel: boolean;
   onCancel: () => void;
   onApply: (crop: BannerCrop) => void;
 }) {
   const [url, setUrl] = useState('');
   const [size, setSize] = useState<Size>();
-  const [view, setView] = useState(initialView);
+  const [adjustment, setView] = useState(initialView);
   const [error, setError] = useState('');
   const [applying, setApplying] = useState(false);
   const image = useRef<HTMLImageElement>(null);
@@ -98,17 +90,12 @@ export function BannerCropDialog({ source, initialView = CENTER, mixedCarousel, 
     };
   }, [source]);
 
+  const fitZoom = size ? Math.min(size.width, size.height * ASPECT) / Math.max(size.width, size.height * ASPECT) : 1;
+  const fitView = { ...CENTER, zoom: fitZoom };
+  const view = adjustment ?? fitView;
   const crop = size ? cropRect(size, view) : undefined;
   const canMoveX = !!(size && crop && size.width - crop.width > 0.01);
   const canMoveY = !!(size && crop && size.height - crop.height > 0.01);
-  // On a 392 px phone the carousel is 360 px wide. Text banners in the
-  // same rotation set a fixed 148 px height instead of the artwork ratio.
-  const phoneAspect = mixedCarousel ? 360 / 148 : ASPECT;
-  const phoneWidth = crop ? crop.height * phoneAspect : 0;
-  const phoneCrop = crop && { ...crop, width: phoneWidth, x: crop.x + (crop.width - phoneWidth) / 2 };
-  const fillsFrame = !!(crop && size && crop.width <= size.width && crop.height <= size.height);
-  const safeAspect = mixedCarousel ? 288 / 148 : ASPECT;
-  const fitZoom = size ? Math.min(size.width, size.height * ASPECT) / Math.max(size.width * ASPECT / safeAspect, size.height * ASPECT) : 1;
 
   function startDrag(event: PointerEvent<HTMLDivElement>) {
     if ((!canMoveX && !canMoveY) || !event.isPrimary || event.button !== 0) return;
@@ -149,18 +136,17 @@ export function BannerCropDialog({ source, initialView = CENTER, mixedCarousel, 
     <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto bg-white p-5 text-slate-900 sm:max-w-3xl" showCloseButton={!applying}>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-[#142b48]"><Crop size={19} /> Crop banner artwork</DialogTitle>
-        <DialogDescription>Drag or use the controls to frame the image. The crop is saved at 1200 × 450 px.</DialogDescription>
+        <DialogDescription>Artwork is saved at 1200 × 450 px. The full image fits by default, and you can zoom or drag to crop it.</DialogDescription>
       </DialogHeader>
 
       <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold tracking-wide text-slate-600">CROP AREA · 8:3</p>
-            <Button type="button" variant="outline" className="h-11" disabled={!size || applying} onClick={() => setView({ ...CENTER, zoom: fitZoom })}><Maximize size={15} /> Fit full image</Button>
+            <Button type="button" variant="outline" className="h-11" disabled={!size || applying} onClick={() => setView(fitView)}><Maximize size={15} /> Fit full image</Button>
           </div>
           <div className={`relative isolate aspect-[8/3] overflow-hidden rounded-xl bg-[#002B70] ring-1 ring-slate-200 ${canMoveX || canMoveY ? 'touch-none cursor-grab active:cursor-grabbing' : ''}`}
             onPointerDown={startDrag} onPointerMove={moveDrag} onLostPointerCapture={() => { drag.current = null; }}>
-            {size && !fillsFrame && <img src={url} alt="" aria-hidden className="pointer-events-none absolute inset-0 size-full scale-110 object-cover opacity-75 blur-md" />}
             {url && <img ref={image} src={url} alt="" draggable={false} className="pointer-events-none absolute max-w-none select-none"
               style={crop && size ? imageStyle(crop, size) : { visibility: 'hidden' }}
               onLoad={event => setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
@@ -181,18 +167,17 @@ export function BannerCropDialog({ source, initialView = CENTER, mixedCarousel, 
 
         <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="mb-2 text-xs font-semibold tracking-wide text-slate-600">APP PREVIEW</p>
-          <div className="relative overflow-hidden rounded-xl bg-[#002B70]" style={{ aspectRatio: phoneAspect }}>
-            {size && !fillsFrame && <img src={url} alt="" aria-hidden className="absolute inset-0 size-full scale-110 object-cover opacity-75 blur-md" />}
-            {size && phoneCrop && <img src={url} alt="Cropped banner in the app" className="absolute max-w-none" style={imageStyle(phoneCrop, size)} />}
+          <div className="relative aspect-[8/3] overflow-hidden rounded-xl bg-[#002B70]">
+            {size && crop && <img src={url} alt="Banner artwork preview" className="absolute max-w-none" style={imageStyle(crop, size)} />}
           </div>
-          <p className="mt-2 text-xs leading-5 text-slate-600">{mixedCarousel ? 'Text banners make the frame taller on phones. Use Fit full image to keep text and logos inside the visible area.' : 'Preview of the artwork in the home carousel.'}</p>
+          <p className="mt-2 text-xs leading-5 text-slate-600">The app shows this full frame at each screen size.</p>
         </div>
       </div>
       {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <DialogFooter className="-mx-5 -mb-5 items-stretch gap-2 sm:items-center">
-        <Button type="button" variant="ghost" className="h-11 sm:me-auto" disabled={!size || applying} onClick={() => setView(CENTER)}><RotateCcw size={16} /> Reset crop</Button>
+        <Button type="button" variant="ghost" className="h-11 sm:me-auto" disabled={!size || applying} onClick={() => setView(initialView)}><RotateCcw size={16} /> Reset framing</Button>
         <Button type="button" variant="outline" className="h-11" onClick={onCancel} disabled={applying}>Cancel</Button>
-        <Button type="button" className="h-11 bg-[#002B70] text-white" disabled={!crop || applying} onClick={apply}>{applying && <Loader2 className="animate-spin" />}Use crop</Button>
+        <Button type="button" className="h-11 bg-[#002B70] text-white" disabled={!crop || applying} onClick={apply}>{applying && <Loader2 className="animate-spin" />}Use artwork</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>;
